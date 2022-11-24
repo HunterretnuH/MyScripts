@@ -1,0 +1,6 @@
+#!/bin/bash
+
+CURRENT_OUTPUT_INDEX="$(swaymsg -t get_outputs | jq 'map(.focused)|to_entries|.[]|select(.value)|.key+1')"
+NUMBER=$1
+
+swaymsg "move container to workspace $CURRENT_OUTPUT_INDEX-$NUMBER"

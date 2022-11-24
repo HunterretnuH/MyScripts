@@ -1,0 +1,39 @@
+#!/bin/bash
+
+if [ $1 == "previous" ] || [ $1 == "next" ]; then
+    COMMAND=$1
+
+    CURRENT_WORKSPACE_INDEX=$(swaymsg -t get_workspaces | jq 'map(.focused)|to_entries|.[]|select(.value==true)|.key')
+    CURRENT_WORKSPACE_NAME=$(swaymsg -t get_workspaces | jq -r ".[$CURRENT_WORKSPACE_INDEX].name")
+    CURRENT_OUTPUT_NAME="$(swaymsg -t get_outputs | jq -r '.[]|select(.focused)|.name')"
+    OUTPUT_WORKSPACES_NAMES=($(swaymsg -t get_workspaces | jq -r ".[]|select(.output==\"$CURRENT_OUTPUT_NAME\")|.name"))
+
+    #SORT ARRAY https://stackoverflow.com/questions/7442417/how-to-sort-an-array-in-bash
+    IFS=$'\n' OUTPUT_WORKSPACES_NAMES=($(sort <<<"${OUTPUT_WORKSPACES_NAMES[*]}")); unset IFS  
+
+    NEW_WORKSPACE_NAME=$CURRENT_WORKSPACE_NAME
+    INDEX=0
+    for NAME in ${OUTPUT_WORKSPACES_NAMES[@]}
+    do
+        if [ $NAME == $CURRENT_WORKSPACE_NAME ]; then
+            if [ $COMMAND == "next" ]; then
+                    NUMBER_OF_WORKSPACES=${#OUTPUT_WORKSPACES_NAMES[@]}
+                    NEW_WORKSPACE_NAME=${OUTPUT_WORKSPACES_NAMES[$(( ($INDEX+1) % $NUMBER_OF_WORKSPACES))]}
+            else
+                    NEW_WORKSPACE_NAME=${OUTPUT_WORKSPACES_NAMES[$(( $INDEX-1 ))]}
+            fi
+            break
+        fi
+        INDEX=$(($INDEX+1))
+    done
+    swaymsg "workspace $NEW_WORKSPACE_NAME"
+else
+    CURRENT_OUTPUT_INDEX="$(swaymsg -t get_outputs | jq 'map(.focused)|to_entries|.[]|select(.value)|.key+1')"
+
+    NUMBER=$1
+
+    # Prefix every workspace with output index:
+    # - If it doesn't exist yet, it will be created on the current, focused output.
+    # - If it exists it must be on the current output and it will be focused.
+    swaymsg "workspace $CURRENT_OUTPUT_INDEX-$NUMBER"
+fi

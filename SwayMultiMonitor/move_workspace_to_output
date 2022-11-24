@@ -1,0 +1,80 @@
+#!/bin/bash
+
+DIRECTION=$1
+
+swaymsg "move workspace to output $DIRECTION"
+
+#OUTPUT="$(swaymsg -t get_outputs | jq -r '.[]|select(.focused)|.name')"
+
+CURRENT_WORKSPACE_INDEX=$(swaymsg -t get_workspaces | jq 'map(.focused)|to_entries|.[]|select(.value==true)|.key')
+CURRENT_WORKSPACE_NAME=$(swaymsg -t get_workspaces | jq -r ".[$CURRENT_WORKSPACE_INDEX].name")
+NEW_OUTPUT_INDEX="$(swaymsg -t get_outputs | jq 'map(.focused)|to_entries|.[]|select(.value)|.key+1')"
+NEW_OUTPUT_NAME="$(swaymsg -t get_outputs | jq -r '.[]|select(.focused)|.name')"
+
+NEW_MONITOR_WORKSPACE_NAMES=$(swaymsg -t get_workspaces | jq -r ".[]|select(.output==\"$NEW_OUTPUT_NAME\")|.name")
+WORKSPACE_NAME_INDEX=$(echo $CURRENT_WORKSPACE_NAME | cut -d - -f 2-)
+
+NEW_WORKSPACE_NAME="$NEW_OUTPUT_INDEX-$WORKSPACE_NAME_INDEX"
+
+NAME_COLLISION_OCCURED=0
+
+for NAME in $NEW_MONITOR_WORKSPACE_NAMES
+do
+    if [ $NAME == $NEW_WORKSPACE_NAME ]; then
+        NAME_COLLISION_OCCURED=1
+    fi
+done
+
+#CURRENT_WORKSPACE_INDEX = $CURRENT_WORKSPACE_INDEX \n\
+#CURRENT_WORKSPACE_NAME = $CURRENT_WORKSPACE_NAME\n\
+#NEW_OUTPUT_INDEX = $NEW_OUTPUT_INDEX\n\
+#NEW_OUTPUT_NAME = $NEW_OUTPUT_NAME\n\
+#NEW_MONITOR_WORKSPACE_NAMES = $NEW_MONITOR_WORKSPACE_NAMES\n
+#WORKSPACE_NAME_INDEX = $WORKSPACE_NAME_INDEX\n\
+#NEW_WORKSPACE_NAME = $NEW_WORKSPACE_NAME\n\
+#NAME_COLLISION_OCCURED = $NAME_COLLISION_OCCURED\n"
+
+#notify-send "SwayMultiMonitor Debug" \
+#"NEW_MONITOR_WORKSPACE_NAMES = $NEW_MONITOR_WORKSPACE_NAMES"
+
+
+if [ $NAME_COLLISION_OCCURED -eq 1 ]; then
+    NEW_WORKSPACE_NAME_FOUND=0
+
+    WORKSPACE_INDEX_TO_CHECK=0
+    while [ $NEW_WORKSPACE_NAME_FOUND -eq 0 ]
+    do
+        WORKSPACE_INDEX_TO_CHECK=$(($WORKSPACE_INDEX_TO_CHECK + 1))
+        if [ $WORKSPACE_INDEX_TO_CHECK -eq 10 ]; then
+            WORKSPACE_INDEX_TO_CHECK=0
+        fi
+        IS_NAME_FREE=1
+        for NAME in $NEW_MONITOR_WORKSPACE_NAMES
+        do
+            if [ "$NEW_OUTPUT_INDEX-$WORKSPACE_INDEX_TO_CHECK" == "$NAME" ]; then
+                IS_NAME_FREE=0
+            fi
+                #notify-send "$IS_NAME_FREE" "$NEW_OUTPUT_INDEX-$WORKSPACE_INDEX_TO_CHECK \n$NAME"
+        done
+        if [ $IS_NAME_FREE -eq 1 ]; then
+            NEW_WORKSPACE_NAME_FOUND=1
+            NEW_WORKSPACE_NAME="$NEW_OUTPUT_INDEX-$WORKSPACE_INDEX_TO_CHECK"
+        fi
+        if [ $WORKSPACE_INDEX_TO_CHECK -eq 0 ]; then
+            break
+        fi
+    done
+
+fi
+
+#notify-send "SwayMultiMonitor Debug" \
+#"NAME_COLLISION_OCCURED = $NAME_COLLISION_OCCURED\n\
+#NEW_WORKSPACE_NAME_FOUND = $NEW_WORKSPACE_NAME_FOUND\n\
+#NEW_WORKSPACE_NAME = $NEW_WORKSPACE_NAME"
+
+if [ $NAME_COLLISION_OCCURED -eq 0 ] || [ $NEW_WORKSPACE_NAME_FOUND -eq 1 ]; then
+    swaymsg "rename workspace $WORKSPACE_NAME to $NEW_WORKSPACE_NAME"
+else
+    notify-send "SwayMultiMonitor Error" "Could not resolve name collision."
+fi
+
